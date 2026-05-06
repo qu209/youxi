@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PlayOS - Game Engine</title>
+    <style>
+        :root {
+            /* iOS 26 风格蓝色系 */
+            --glass-bg: rgba(20, 80, 200, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            --blur: blur(20px);
+            --theme-blue: #0A84FF;
+            --text-color: #E5E5EA;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            /* 动态蓝色渐变背景，凸显毛玻璃效果 */
+            background: linear-gradient(135deg, #020024 0%, #090979 35%, #00d4ff 100%);
+            background-attachment: fixed;
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        /* 核心毛玻璃类 */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: var(--blur);
+            -webkit-backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            border-radius: 24px;
+        }
+
+        /* 顶部导航栏 */
+        .header {
+            margin: 15px;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, #fff, #87CEFA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn {
+            background: rgba(10, 132, 255, 0.3);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: rgba(10, 132, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        /* 主工作区 - 游戏机布局 */
+        .main-console {
+            display: flex;
+            flex: 1;
+            margin: 0 15px;
+            gap: 15px;
+            height: calc(100vh - 220px);
+        }
+
+        /* 代码编辑器区域 */
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        .editor-container h2 {
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            color: #A2D5F2;
+        }
+
+        #codeEditor {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: "SF Mono", Consolas, monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        /* 预览区域 (屏幕) */
+        .preview-container {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .preview-container::before {
+            content: '';
+            position: absolute;
+            top: -5px; bottom: -5px; left: -5px; right: -5px;
+            border-radius: 28px;
+            background: linear-gradient(45deg, rgba(0,212,255,0.2), transparent, rgba(10,132,255,0.2));
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        #gameScreen {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 16px;
+            background: #fff; /* 默认白色背景供HTML运行 */
+        }
+
+        /* 底部存档区域 */
+        .save-slots {
+            margin: 15px;
+            padding: 15px;
+            height: 120px;
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            align-items: center;
+            scrollbar-width: none; /* Firefox */
+        }
+        
+        .save-slots::-webkit-scrollbar {
+            display: none; /* Safari and Chrome */
+        }
+
+        .slot-card {
+            min-width: 120px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .slot-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: var(--theme-blue);
+        }
+
+        .slot-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-align: center;
+            width: 90%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: #FF3B30;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #fff;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .slot-card:hover .delete-btn {
+            opacity: 1;
+        }
+
+        /* 响应式：移动端纵向排列 */
+        @media (max-width: 768px) {
+            .main-console {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header glass">
+        <h1>PlayOS_Engine</h1>
+        <div>
+            <button class="btn" id="saveBtn">💾 保存卡带</button>
+        </div>
+    </div>
+
+    <div class="main-console">
+        <div class="editor-container glass">
+            <h2><span style="color: #4cd964;">●</span> 源码终端</h2>
+            <textarea id="codeEditor" spellcheck="false" placeholder="在此处输入你的HTML/JS小游戏代码...&#10;&#10;例如:&#10;<h1>Hello Game!</h1>&#10;<script>&#10;  console.log('Running...');&#10;</script>"></textarea>
+        </div>
+
+        <div class="preview-container glass">
+            <iframe id="gameScreen" sandbox="allow-scripts allow-modals allow-pointer-lock allow-same-origin"></iframe>
+        </div>
+    </div>
+
+    <div class="save-slots glass" id="saveSlots">
+        </div>
+
+    <script>
+        const editor = document.getElementById('codeEditor');
+        const screen = document.getElementById('gameScreen');
+        const saveBtn = document.getElementById('saveBtn');
+        const saveSlots = document.getElementById('saveSlots');
+
+        let typingTimer;
+        const doneTypingInterval = 500; // 停止输入 500ms 后刷新预览
+
+        // 初始化加载
+        window.onload = () => {
+            // 恢复上次未写完的草稿 (防止刷新丢失)
+            const draft = localStorage.getItem('playOS_draft');
+            if (draft) {
+                editor.value = draft;
+                updateScreen();
+            }
+            renderSavedGames();
+        };
+
+        // 监听输入并实时运行
+        editor.addEventListener('input', () => {
+            clearTimeout(typingTimer);
+            // 存入草稿箱
+            localStorage.setItem('playOS_draft', editor.value);
+            // 延迟执行，避免打字卡顿
+            typingTimer = setTimeout(updateScreen, doneTypingInterval);
+        });
+
+        // 将代码注入 iframe
+        function updateScreen() {
+            const code = editor.value;
+            // 使用 srcdoc 属性是运行实时 HTML 的最安全和现代的方式
+            screen.srcdoc = code;
+        }
+
+        // 保存游戏逻辑
+        saveBtn.addEventListener('click', () => {
+            const code = editor.value.trim();
+            if (!code) return alert("代码是空的，先写点什么吧！");
+
+            const gameName = prompt("给你的游戏卡带起个名字：", "未命名游戏 " + new Date().getHours() + ":" + new Date().getMinutes());
+            if (!gameName) return;
+
+            const newGame = {
+                id: Date.now().toString(),
+                name: gameName,
+                code: code,
+                date: new Date().toLocaleDateString()
+            };
+
+            let games = JSON.parse(localStorage.getItem('playOS_games') || '[]');
+            games.push(newGame);
+            localStorage.setItem('playOS_games', JSON.stringify(games));
+            
+            renderSavedGames();
+        });
+
+        // 渲染底部存档列表
+        function renderSavedGames() {
+            saveSlots.innerHTML = '';
+            let games = JSON.parse(localStorage.getItem('playOS_games') || '[]');
+
+            if (games.length === 0) {
+                saveSlots.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin: auto;">目前没有保存的卡带，赶快写一个吧！</span>';
+                return;
+            }
+
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'slot-card';
+                card.innerHTML = `
+                    <div class="slot-title">${game.name}</div>
+                    <div style="font-size: 0.7rem; color: #A2D5F2; margin-top: 5px;">${game.date}</div>
+                    <div class="delete-btn" data-id="${game.id}">×</div>
+                `;
+
+                // 点击卡带读取游戏
+                card.addEventListener('click', (e) => {
+                    // 如果点的是删除按钮，则不读取
+                    if (e.target.classList.contains('delete-btn')) return;
+                    
+                    editor.value = game.code;
+                    localStorage.setItem('playOS_draft', game.code);
+                    updateScreen();
+                });
+
+                saveSlots.appendChild(card);
+            });
+
+            // 绑定删除事件
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    if(confirm("确定要删除这个游戏卡带吗？")) {
+                        games = games.filter(g => g.id !== id);
+                        localStorage.setItem('playOS_games', JSON.stringify(games));
+                        renderSavedGames();
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>
